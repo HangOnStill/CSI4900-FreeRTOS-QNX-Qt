@@ -1,0 +1,8 @@
+# R2 explicit idle observation, same normalized microsecond timebase
+0,SWITCH_IN,0
+20,SWITCH_OUT,0
+20,RELEASE,1
+20,SWITCH_IN,1
+80,COMPLETE,1
+80,SWITCH_IN,0
+100,SWITCH_OUT,0

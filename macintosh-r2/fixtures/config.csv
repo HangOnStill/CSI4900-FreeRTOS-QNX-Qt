@@ -1,0 +1,6 @@
+# TASK,id,period_us,deadline_us,jitter_bound_us,block_bound_us
+TASK,1,10000,5000,200,1000
+TASK,2,10000,8000,200,1500
+# ISR,id,budget_us
+ISR,1,600
+ISR,2,100

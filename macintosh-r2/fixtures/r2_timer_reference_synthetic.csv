@@ -1,0 +1,5 @@
+run_id,marker,trace_us,reference_us,reference_overhead_us
+synthetic_A,baseline,100,1000,3
+synthetic_A,task_release,1100,2000,3
+synthetic_A,isr_enter,2100,2996,3
+synthetic_A,isr_exit,2205,3100,3

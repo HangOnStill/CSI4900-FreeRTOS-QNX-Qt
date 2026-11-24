@@ -1,0 +1,17 @@
+**/build/
+**/__pycache__/
+**/*.pyc
+**/*.exe
+**/*.o
+**/*.bin
+*.zip
+*.etl
+*.pcap
+*.pem
+*.key
+*hostkey*
+*host_key*
+*private_key*
+**/evidence/
+**/.ssh/
+.env
