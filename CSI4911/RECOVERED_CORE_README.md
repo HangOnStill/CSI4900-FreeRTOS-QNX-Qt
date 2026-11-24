@@ -14,7 +14,7 @@ Recovered 17 application files under CSI4911/Core/{Src,Inc,Startup} verbatim fro
 ## Blocking discrepancies
 1. The committed CSI4911.ioc still names defaultTask, task_green, task_blue, task_red, unlike the source. Regenerating with STM32CubeIDE may overwrite or change the archived custom task code. Resolve before regeneration and preserve USER CODE sections.
 2. The original archive contains vendor Drivers and Middlewares, and old Debug/Release ELF binaries, but those do not establish a fresh 2026-11-23 firmware build. GNU Tools for STM32 / STM32CubeIDE were not available on the owner's Windows PC. No ARM build and no board flash was performed.
-3. Source port configuration alone does not identify the actual NUCLEO header pads. Verify MCU datasheet, board schematic, PG7/PG8 actual direction and 3.3V signal before wiring.
+3. **Critical board-routing issue:** ST UM2581 Rev 5 Section 6.12 says this NUCLEO-L552ZE-Q board defaults to SB127/SB129 ON, LPUART1 PG7(TX)/PG8(RX) connected to ST-LINK USB Virtual COM, and SB128/SB130 OFF (NOT Arduino D1/D0). The GPIOG AF8 source configuration does not make the TX line appear at Arduino D1. CN12 access additionally depends on actual SB168/SB167 bridge continuity. See integration/NUCLEO_L552ZE_Q_PINOUT_PREFLIGHT.md; do not wire the Pi until the exact PCB revision and solder-bridge state are verified.
 4. Wire v1 lacks release/completion, ISR and synchronization, source overflow status, and clock-epoch features required by the R2 timing engine; no inferences from switch events can substitute.
 5. Xavier's invitation to private 613Xav/CSI4911 was found in email, but the repository was not readable through the connected GitHub account. This branch does NOT claim to supersede those newer files.
 
