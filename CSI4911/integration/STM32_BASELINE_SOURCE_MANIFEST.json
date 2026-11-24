@@ -1,0 +1,115 @@
+{
+  "source_provenance": "Older archived 'Xavier Codes' 2026-11-15, NOT Xavier's latest November 23 firmware",
+  "sha256_preserved_core_files": [
+    {
+      "path": "Core/Inc/FreeRTOSConfig.h",
+      "bytes": 7654,
+      "sha256": "1dfa472ae45e100fe734238ec918071cb71fb791a8ccee5435cd270b97222478"
+    },
+    {
+      "path": "Core/Inc/main.h",
+      "bytes": 2099,
+      "sha256": "2d1ccc7106adbf45e1ee9eb4bc926f3672dcf28388d0a760352dbf2b7003a250"
+    },
+    {
+      "path": "Core/Inc/stm32l5xx_hal_conf.h",
+      "bytes": 15088,
+      "sha256": "3b293f720180f43f2d6495f96f10a8046917e475b79c37949247107d5300932d"
+    },
+    {
+      "path": "Core/Inc/stm32l5xx_it.h",
+      "bytes": 1809,
+      "sha256": "6946e2fbff2f24eef4e389ca2dd2268017229cb877be7a3b4d0628465843f38e"
+    },
+    {
+      "path": "Core/Inc/trace_buffer.h",
+      "bytes": 552,
+      "sha256": "b060dc3e1b68c56dd8da54ae1dcd6beef2a4b923f09c6392bb7162df491446f8"
+    },
+    {
+      "path": "Core/Inc/trace_transport.h",
+      "bytes": 198,
+      "sha256": "865959bdec2e570cc3da906bb4c5918a102204d277e0d45d7d1d689780f887ff"
+    },
+    {
+      "path": "Core/Src/app_freertos.c",
+      "bytes": 4461,
+      "sha256": "da670aecebde8dcd021d07fb57ef9ab5b254eb45ea23d1ffca8f80aa682b0109"
+    },
+    {
+      "path": "Core/Src/main.c",
+      "bytes": 8292,
+      "sha256": "ae2893e3650677d2d4843318902f58f6624f350cb6686d423e5cf7b8f02e6441"
+    },
+    {
+      "path": "Core/Src/stm32l5xx_hal_msp.c",
+      "bytes": 2357,
+      "sha256": "a3e6173384a45e9b5ae3b7d41e00b845191dc357f38a9828cbd50bb44930986e"
+    },
+    {
+      "path": "Core/Src/stm32l5xx_hal_timebase_tim.c",
+      "bytes": 3978,
+      "sha256": "d5d1b1cc1beda834efaa6b4b852bc5196973e5e585e2ed3113b355829cb3a5f9"
+    },
+    {
+      "path": "Core/Src/stm32l5xx_it.c",
+      "bytes": 4718,
+      "sha256": "0d90db7e0f9a103b3636c5a592ee938577781f7a2560951d87bb7aa023e6e317"
+    },
+    {
+      "path": "Core/Src/syscalls.c",
+      "bytes": 2847,
+      "sha256": "b993ebb4f882e8be21cec8d95983655a0caf4f0eb11348f20f6371f5a5031717"
+    },
+    {
+      "path": "Core/Src/sysmem.c",
+      "bytes": 2987,
+      "sha256": "147c60a13e805f62003d63f9de068b925e386de6d8844b1279620f715919c940"
+    },
+    {
+      "path": "Core/Src/system_stm32l5xx.c",
+      "bytes": 13259,
+      "sha256": "2995fec63aa8a74220d64505f137f721f5fe1175dc2fcfbf657ead30025fad58"
+    },
+    {
+      "path": "Core/Src/trace_buffer.c",
+      "bytes": 2082,
+      "sha256": "00d4d1c785ca4fd92236b0b8d580f19a340fc8ff752214141c7ddd41a4b52d78"
+    },
+    {
+      "path": "Core/Src/trace_transport.c",
+      "bytes": 3508,
+      "sha256": "f8b44c89349ba33b77b9d388dc97ec9cc50139a9e670f8ed4e0850e579ff4383"
+    },
+    {
+      "path": "Core/Startup/startup_stm32l552zetxq.s",
+      "bytes": 15539,
+      "sha256": "a0089a509bcf4ef1fe631a08060e7336acffc3c2b380609ec99fca165fea865e"
+    }
+  ],
+  "static_source_checks": {
+    "task_names_match_collector": true,
+    "v1_event_type_ids": true,
+    "switch_hooks_enabled": true,
+    "DWT_counter_enabled_and_read": true,
+    "FNV1a_task_hash": true,
+    "ring_overflow_counter": true,
+    "uart_PG7_PG8_AF8": true,
+    "uart_LPUART1_115200": true,
+    "wire_header_and_crc": true,
+    "ioc_source_task_name_conflict_detected": true,
+    "v1_lacks_explicit_RELEASE_COMPLETE": true
+  },
+  "task_fnv1a_hashes": {
+    "SensorTask": 984684714,
+    "ControlTask": 2778717891,
+    "LoggerTask": 2745854620,
+    "CommunicationTask": 441466882
+  },
+  "CPU_hsi_nominal": "16 MHz configured in archived main.c; measured frequency NOT VERIFIED",
+  "UART_source": "LPUART1 GPIOG PG7/PG8 AF8, 115200 baud; board connector mapping NOT VERIFIED",
+  "stm32_build": "NOT RUN - GNU Tools for STM32 toolchain unavailable",
+  "live_hardware_capture": "NOT RUN - Pi and STM32 power off",
+  "ioc_source_mismatch": "DETECTED; generator could replace user task source",
+  "v1_release_complete_isr_semantics": "NOT PRESENT"
+}
