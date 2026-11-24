@@ -3,6 +3,9 @@
  *
  * Output is timestamp_us,EVENT,id for the existing R2 normalized-event CLI.
  */
+#ifndef _WIN32
+#define _POSIX_C_SOURCE 200809L
+#endif
 #include <errno.h>
 #include <fcntl.h>
 #include <inttypes.h>
@@ -30,7 +33,9 @@ typedef struct
   uint32_t cycles;
   uint32_t previous_cycles;
   uint64_t timestamp_us;
+  uint32_t fractional_cycles;
   int previous_cycles_valid;
+  int previous_sequence_valid;
   int frame_count;
   int crc_error_count;
   int frame_gap_count;
@@ -102,9 +107,10 @@ static int map_object(Collector *c, uint32_t object_hash)
   return -1;
 }
 
-static void emit_gap(FILE *out)
+static void emit_gap(Collector *c, FILE *out)
 {
-  fprintf(out, "0,GAP,-1\n");
+  /* Invalidate downstream state at the most recent known event time. */
+  fprintf(out, "%" PRIu64 ",GAP,-1\n", c->timestamp_us);
 }
 
 static uint64_t cycles_to_us(Collector *c, uint32_t cycles, uint32_t cycles_per_us)
@@ -122,7 +128,9 @@ static uint64_t cycles_to_us(Collector *c, uint32_t cycles, uint32_t cycles_per_
       delta = cycles - c->previous_cycles;
     else
       delta = UINT32_MAX - c->previous_cycles + cycles + 1U;
-    c->timestamp_us += (uint64_t)delta / cycles_per_us;
+    uint64_t total_cycles = (uint64_t)delta + c->fractional_cycles;
+    c->timestamp_us += total_cycles / cycles_per_us;
+    c->fractional_cycles = (uint32_t)(total_cycles % cycles_per_us);
     c->previous_cycles = cycles;
   }
   return c->timestamp_us;
@@ -152,7 +160,7 @@ static int parse_frame(Collector *c, const uint8_t *frame, size_t size,
       event_count > 8U)
   {
     c->invalid_frame_count++;
-    emit_gap(out);
+    emit_gap(c, out);
     return -1;
   }
 
@@ -160,7 +168,7 @@ static int parse_frame(Collector *c, const uint8_t *frame, size_t size,
   if (crc_offset + 2U != size)
   {
     c->invalid_frame_count++;
-    emit_gap(out);
+    emit_gap(c, out);
     return -1;
   }
 
@@ -169,16 +177,17 @@ static int parse_frame(Collector *c, const uint8_t *frame, size_t size,
   if (received_crc != calculated_crc)
   {
     c->crc_error_count++;
-    emit_gap(out);
+    emit_gap(c, out);
     return -1;
   }
 
-  if (c->serial != 0U && frame_sequence != c->serial + 1U)
+  if (c->previous_sequence_valid && frame_sequence != c->serial + 1U)
   {
     c->frame_gap_count++;
-    emit_gap(out);
+    emit_gap(c, out);
   }
   c->serial = frame_sequence;
+  c->previous_sequence_valid = 1;
   c->frame_count++;
 
   for (uint8_t i = 0; i < event_count; ++i)
@@ -189,6 +198,12 @@ static int parse_frame(Collector *c, const uint8_t *frame, size_t size,
     uint32_t cycles = read_u32(&event[5]);
     uint64_t timestamp_us = cycles_to_us(c, cycles, cycles_per_us);
 
+    if (type != 1U && type != 2U)
+    {
+      c->invalid_frame_count++;
+      emit_gap(c, out);
+      return -1;
+    }
     if (type == 1U || type == 2U)
     {
       int id = map_object(c, object_hash);
@@ -199,7 +214,7 @@ static int parse_frame(Collector *c, const uint8_t *frame, size_t size,
       }
       else
       {
-        emit_gap(out);
+        emit_gap(c, out);
       }
     }
   }
@@ -215,7 +230,10 @@ static int configure_serial(int fd)
   struct termios settings;
   if (tcgetattr(fd, &settings) != 0)
     return -1;
-  cfmakeraw(&settings);
+  /* cfmakeraw is not POSIX and may be hidden by strict C11/QNX headers. */
+  settings.c_iflag &= ~(IGNBRK | BRKINT | PARMRK | ISTRIP | INLCR | IGNCR | ICRNL | IXON);
+  settings.c_oflag &= ~OPOST;
+  settings.c_lflag &= ~(ECHO | ECHONL | ICANON | ISIG | IEXTEN);
   cfsetispeed(&settings, B115200);
   cfsetospeed(&settings, B115200);
   settings.c_cflag |= CLOCAL | CREAD;
@@ -238,7 +256,7 @@ static int read_source(int fd, uint8_t *buffer, size_t size)
   if (n < 0)
   {
     if (errno == EINTR)
-      return 0;
+      return -2; /* Interrupted read: retry without claiming EOF. */
     return -1;
   }
   return (int)n;
@@ -315,7 +333,11 @@ int main(int argc, char **argv)
   }
   else
   {
+#ifdef _WIN32
+    fd = open(device, O_RDONLY); /* Never used for live UART on Windows. */
+#else
     fd = open(device, O_RDONLY | O_NOCTTY);
+#endif
     if (fd < 0)
     {
       perror(device);
@@ -335,62 +357,113 @@ int main(int argc, char **argv)
 
   uint8_t buffer[4096];
   size_t buffered = 0;
+  int io_error = 0;
 
   for (;;)
   {
     size_t available = sizeof(buffer) - buffered;
+    if (available == 0U)
+    {
+      /* Valid v1 frames are bounded to 116 bytes; saturation is corrupt. */
+      c.invalid_frame_count++;
+      emit_gap(&c, out);
+      buffered = 0;
+      available = sizeof(buffer);
+    }
+
     int n = fixture_file
                 ? (int)fread(buffer + buffered, 1, available, fixture_file)
                 : read_source(fd, buffer + buffered, available);
-    if (n == 0)
-    {
-      if (fixture_file)
-        break;
-      continue;
-    }
+
+    if (n == -2)
+      continue; /* interrupted serial read */
     if (n < 0)
     {
       fprintf(stderr, "Serial read failed: %s\n", strerror(errno));
+      io_error = 1;
       break;
     }
-    buffered += (size_t)n;
-
-    size_t start = 0;
-    while (start + 1 < buffered)
+    if (n == 0 && !fixture_file)
     {
-      if (buffer[start] == FRAME_SYNC_0 && buffer[start + 1] == FRAME_SYNC_1)
+      fprintf(stderr, "Serial device returned EOF\n");
+      io_error = 1;
+      break;
+    }
+
+    if (n > 0)
+      buffered += (size_t)n;
+
+    /*
+     * Drain every complete frame already buffered, including when one read
+     * contains several frames or the fixture is at EOF.
+     */
+    for (;;)
+    {
+      if (buffered < 2U)
         break;
-      start++;
-    }
-    if (start > 0)
-    {
-      memmove(buffer, buffer + start, buffered - start);
-      buffered -= start;
+
+      size_t start = 0;
+      while (start + 1U < buffered &&
+             !(buffer[start] == FRAME_SYNC_0 && buffer[start+1] == FRAME_SYNC_1))
+        start++;
+
+      if (start > 0U)
+      {
+        /* Any discarded bytes between valid frames are a loss of evidence. */
+        if (c.previous_sequence_valid)
+        {
+          c.invalid_frame_count++;
+          emit_gap(&c, out);
+        }
+        memmove(buffer, buffer + start, buffered - start);
+        buffered -= start;
+      }
+      if (buffered < HEADER_SIZE)
+        break;
+
+      if (buffer[2] != PROTOCOL_VERSION)
+      {
+        c.invalid_frame_count++;
+        emit_gap(&c, out);
+        memmove(buffer, buffer + 1U, buffered - 1U);
+        buffered--;
+        continue;
+      }
+
+      uint16_t declared_length = read_u16(&buffer[3]);
+      size_t frame_size = 2U + declared_length;
+      if (declared_length < 23U || declared_length > 114U)
+      {
+        c.invalid_frame_count++;
+        emit_gap(&c, out);
+        memmove(buffer, buffer + 1U, buffered - 1U);
+        buffered--;
+        continue;
+      }
+      if (buffered < frame_size)
+        break;
+
+      (void)parse_frame(&c, buffer, frame_size, out, cycles_per_us);
+      memmove(buffer, buffer + frame_size, buffered - frame_size);
+      buffered -= frame_size;
     }
 
-    if (buffered < HEADER_SIZE)
-      continue;
-    if (buffer[2] != PROTOCOL_VERSION)
+    if (n == 0 && fixture_file)
     {
-      memmove(buffer, buffer + 1, buffered - 1);
-      buffered--;
-      continue;
+      if (ferror(fixture_file))
+      {
+        fprintf(stderr, "Fixture read failed\n");
+        io_error = 1;
+      }
+      if (buffered)
+      {
+        /* A partial frame is invalid even if the file's last byte was read. */
+        c.invalid_frame_count++;
+        emit_gap(&c, out);
+        fprintf(stderr, "Incomplete trailing fixture bytes: %zu\n",buffered);
+      }
+      break;
     }
-
-    uint16_t declared_length = read_u16(&buffer[3]);
-    size_t frame_size = 2U + declared_length;
-    if (declared_length < 23U || declared_length > MAX_FRAME_SIZE)
-    {
-      memmove(buffer, buffer + 1, buffered - 1);
-      buffered--;
-      continue;
-    }
-    if (buffered < frame_size)
-      continue;
-
-    parse_frame(&c, buffer, frame_size, out, cycles_per_us);
-    memmove(buffer, buffer + frame_size, buffered - frame_size);
-    buffered -= frame_size;
   }
 
   fprintf(stderr,
@@ -404,5 +477,5 @@ int main(int argc, char **argv)
     close(fd);
   if (output_path)
     fclose(out);
-  return c.invalid_frame_count || c.crc_error_count ? 1 : 0;
+  return io_error || c.frame_gap_count || c.invalid_frame_count || c.crc_error_count ? 1 : 0;
 }
