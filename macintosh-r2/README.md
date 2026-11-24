@@ -15,6 +15,29 @@ py -3 -m unittest tests.test_metrics_v2 tests.test_qt_export_v2 tests.test_timer
 
 On Linux/macOS with a C compiler: `sh build_host.sh` followed by `python3 -m unittest discover -s tests -v` (note that the tests also require the host binaries to have the published `.exe` names). For QNX 8 on Windows, set `QNX_SDP_DIR` to the installed SDK root and run `build_qnx.cmd` — this builds AArch64 but does not certify native execution.
 
+## STM32 v1 UART collector
+
+The standalone collector decodes the current 13-byte v1 task-switch records,
+validates frame CRC and frame-sequence continuity, and writes normalized
+`timestamp_us,EVENT,id` lines for `metrics_cli_v2`:
+
+```sh
+build/uart_collector_v1 --device /dev/ser2 --output decoded_events.csv --cycles-per-us 16
+./build/trace_metrics_v2 fixtures/config.csv decoded_events.csv 10000
+```
+
+Offline binary replay is also available:
+
+```sh
+build/uart_collector_v1 --fixture capture.bin --output decoded_events.csv
+```
+
+Task hashes for `SensorTask`, `ControlTask`, `LoggerTask`, and
+`CommunicationTask` are mapped to R2 task IDs 1–4. Unknown hashes receive
+additional stable IDs in first-observed order. Live execution is still hardware-
+dependent; native QNX serial and STM32 timing conversion must be verified on the
+target.
+
 ## Scope and data contract
 
 Input: **validated, timestamp-ordered normalized microsecond events**, with explicit GAP on missing/corrupt frame or source overflow. Supported tokens: RELEASE, SWITCH_IN, SWITCH_OUT, COMPLETE, BLOCK, UNBLOCK, ISR_ENTER, ISR_EXIT, GAP. The optional `IDLE,<id>` configuration describes an observed idle actor. Unknown CPU time is never fabricated as idle. ISR inclusive durations and exclusive execution time differ under nesting. CPU/task/ISR/idle/unknown exclusive time sums to each window length.
